@@ -2,65 +2,90 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <!-- הגדרות חובה להפיכת הדף לאפליקציית מסך בית ב-iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>OverDrive App</title>
+    <title>OverDrive</title>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; font-family: system-ui, -apple-system, sans-serif; }
         iframe { width: 100%; height: 100%; border: none; }
+        
+        /* עיצוב למסך הטעינה */
         #loading { 
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            color: #fff; font-family: system-ui, -apple-system, sans-serif; font-size: 1.2rem;
+            color: #fff; font-size: 1.2rem; text-align: center; transition: opacity 0.3s;
+        }
+        
+        /* עיצוב לחיווי הרשת הקופץ */
+        #network-indicator {
+            position: absolute; top: 30px; left: 50%; transform: translateX(-50%);
+            background: rgba(20, 20, 20, 0.9); color: #4ade80; 
+            padding: 10px 24px; border-radius: 30px; font-size: 0.95rem; font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5); border: 1px solid #4ade80;
+            opacity: 0; transition: opacity 0.8s ease; pointer-events: none; z-index: 9999;
         }
     </style>
 </head>
 <body>
-    <div id="loading">מתחבר לרכב...</div>
+    <div id="loading">מפעיל חיבור...</div>
+    <div id="network-indicator"></div>
     <iframe id="app-frame" style="display: none;" allow="fullscreen"></iframe>
 
     <script>
-        // הגדרת הכתובות לפי סדר העדיפות שרצית
+        // כתובות הגישה
         const urlWifi = "http://192.168.33.20:8080";
         const urlWG = "http://10.192.1.20:8080";
         const urlZrok = "https://overdriveisc4og.share.zrok.io";
         
         const frame = document.getElementById('app-frame');
         const loader = document.getElementById('loading');
+        const indicator = document.getElementById('network-indicator');
 
-        // פונקציה לבדיקת זמינות כתובת ברקע ללא בעיות CORS
+        // בדיקת זמינות כתובת
         function checkNetwork(url) {
             return new Promise((resolve, reject) => {
-                fetch(url, { mode: 'no-cors', signal: AbortSignal.timeout(1000) })
+                fetch(url, { mode: 'no-cors', signal: AbortSignal.timeout(1200) })
                     .then(() => resolve(true))
                     .catch(() => reject(false));
             });
         }
 
-        // טעינת הכתובת לתוך המסגרת והעלמת מסך הטעינה
-        function loadApp(url) {
+        // טעינת הממשק והצגת הבאנר
+        function loadApp(url, networkName) {
             loader.style.display = 'none';
+            
+            // עדכון והצגת הבאנר
+            indicator.innerText = 'מחובר דרך: ' + networkName;
+            indicator.style.opacity = '1';
+            
+            // העלמת הבאנר אחרי 4 שניות
+            setTimeout(() => {
+                indicator.style.opacity = '0';
+            }, 4000);
+
+            // טעינת המסגרת
             frame.style.display = 'block';
             frame.src = url;
         }
 
-        // לוגיקת הניתוב
+        // לוגיקת הניתוב עם עדכון סטטוס על המסך
         async function init() {
             try {
+                loader.innerText = "בודק חיבור Wi-Fi ביתי...";
                 await checkNetwork(urlWifi);
-                loadApp(urlWifi);
+                loadApp(urlWifi, "Wi-Fi מקומי");
                 return;
             } catch(e) {}
 
             try {
+                loader.innerText = "בודק חיבור WireGuard...";
                 await checkNetwork(urlWG);
-                loadApp(urlWG);
+                loadApp(urlWG, "WireGuard (VPN)");
                 return;
             } catch(e) {}
 
-            // אם שתי הכתובות הפנימיות לא ענו, נופל לכתובת הציבורית
-            loadApp(urlZrok);
+            loader.innerText = "מתחבר מרחוק...";
+            loadApp(urlZrok, "zrok (חיצוני)");
         }
 
         init();
